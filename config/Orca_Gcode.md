@@ -29,3 +29,40 @@ Layer Change G-Code:
 
 ;AFTER_LAYER_CHANGE [layer_num] @ [layer_z]mm
 SET_PRINT_STATS_INFO CURRENT_LAYER={layer_num + 1}
+
+
+Change Filament G-Code:
+
+; =================================================================
+; Filament Change Sequence with Z-Sandwich
+; =================================================================
+; IMPORTANT: Requires PG101 and ORCA_PURGE macros from AddOn.cfg
+; See README.md for setup instructions.
+;
+; Z-Sandwich Logic:
+;   1. Slicer lifts Z +3mm at start
+;   2. PG101 + Firmware do their work (no Z changes in macros)
+;   3. Slicer restores Z -3mm at end
+; This prevents Z stacking errors from competing Z moves.
+; =================================================================
+
+; --- 1. GLOBAL SAFETY LIFT ---
+G91
+G1 Z3 F12000      ; Lift Z +3mm (maintained throughout process)
+G90
+M83
+
+; --- 2. EXECUTE CHANGE ---
+; Retract OLD filament
+G1 E-{retraction_length[current_extruder]} F1800
+
+; Tool Change (Calls PG101 -> Firmware Unload/Load)
+T[next_extruder]
+
+; Purge & Wipe
+ORCA_PURGE FLUSH={flush_length} RETRACT={retraction_length[next_extruder]}
+
+; --- 3. GLOBAL RESTORE ---
+G91
+G1 Z-3 F12000     ; Restore Z -3mm (back to print height)
+G90
